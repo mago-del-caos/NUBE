@@ -3,7 +3,7 @@ from wordcloud import WordCloud
 import random
 from io import BytesIO
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import os
 import urllib.request
 
@@ -17,7 +17,7 @@ else:
     st.info("💡 Sube un archivo 'logo.png' a tu repositorio para que aparezca aquí como encabezado.")
 
 st.title("☁️ Nube Juventud")
-st.markdown("Generador de nubes de palabras oficial. Compara hasta 4 formas y tipografías al mismo tiempo.")
+st.markdown("Generador de nubes de palabras oficial. Compara formas y tipografías, y añade encabezados personalizados.")
 
 # --- DESCARGA AUTOMÁTICA DE FUENTES ---
 @st.cache_resource(show_spinner=False)
@@ -112,7 +112,7 @@ def get_mask(shape_name):
 # --- BARRA LATERAL (Configuración) ---
 st.sidebar.header("⚙️ Configuración Visual")
 
-# 1. Forma de la Nube (Multiselector)
+# 1. Forma de la Nube
 st.sidebar.subheader("1. Formas (Hasta 4)")
 opciones_formas = ["Nube Clásica", "Nube Esponjosa", "Nube Alargada", "Nube Tormenta", "Circular", "Cuadrada", "Triangular", "Estrella", "Corazón", "Diamante", "Hexágono"]
 shape_choices = st.sidebar.multiselect(
@@ -122,7 +122,7 @@ shape_choices = st.sidebar.multiselect(
     max_selections=4
 )
 
-# 2. Tipografías (Multiselector)
+# 2. Tipografías
 st.sidebar.subheader("2. Tipografías")
 font_options = list(available_fonts.keys())
 default_font = ["Roboto"] if "Roboto" in font_options else ([font_options[0]] if font_options else [])
@@ -135,8 +135,13 @@ font_choices = st.sidebar.multiselect(
 if not font_options:
     st.sidebar.warning("⚠️ Problema de red descargando fuentes. Reinicia la app en Streamlit.")
 
-# 3. Colores de la Nube y Contorno
-st.sidebar.subheader("3. Fondos y Contorno")
+# 3. Título de la Imagen
+st.sidebar.subheader("3. Título de la Imagen")
+image_title = st.sidebar.text_input("Escribe un encabezado (opcional):", "")
+title_color = st.sidebar.color_picker("Color del Encabezado", "#FFFFFF")
+
+# 4. Colores de la Nube y Contorno
+st.sidebar.subheader("4. Fondos y Contorno")
 col_bg1, col_bg2 = st.sidebar.columns(2)
 with col_bg1:
     bg_exterior = st.color_picker("Exterior (Fondo)", "#0E1117")
@@ -145,8 +150,8 @@ with col_bg2:
     contour_color = st.color_picker("Color Contorno", "#FFFFFF")
     contour_width = st.slider("Ancho Contorno", 0, 15, 3)
 
-# 4. Paleta de Palabras
-st.sidebar.subheader("4. Colores de Palabras")
+# 5. Paleta de Palabras
+st.sidebar.subheader("5. Colores de Palabras")
 num_colors = st.sidebar.number_input("¿Cuántos colores usar?", min_value=1, max_value=10, value=4)
 selected_colors = []
 color_cols = st.sidebar.columns(2)
@@ -157,8 +162,8 @@ for i in range(int(num_colors)):
         color = st.color_picker(f"Color {i+1}", default_hex[i % len(default_hex)], key=f"color_{i}")
         selected_colors.append(color)
 
-# 5. Ajustes Extra
-st.sidebar.subheader("5. Densidad")
+# 6. Ajustes Extra
+st.sidebar.subheader("6. Densidad")
 max_words = st.sidebar.slider("Máximo de palabras", min_value=50, max_value=2000, value=300)
 
 # --- ÁREA PRINCIPAL ---
@@ -191,7 +196,7 @@ if st.button("🚀 Generar Nube Juventud", type="primary"):
                 for font_name in font_choices:
                     font_path = available_fonts.get(font_name, None)
                     
-                    # Generar la nube
+                    # Generar la nube base
                     wc = WordCloud(
                         width=800, 
                         height=800,
@@ -208,12 +213,34 @@ if st.button("🚀 Generar Nube Juventud", type="primary"):
 
                     wc_image = wc.to_image()
 
-                    # Composición
-                    final_canvas = Image.new("RGB", (800, 800), bg_exterior)
-                    paste_mask = Image.fromarray((255 - mask_array).astype(np.uint8))
-                    final_canvas.paste(wc_image, (0, 0), paste_mask)
+                    # --- COMPOSICIÓN DEL LIENZO FINAL CON O SIN TÍTULO ---
+                    canvas_w = 800
+                    y_offset = 120 if image_title.strip() else 0
+                    canvas_h = 800 + y_offset
+                    
+                    final_canvas = Image.new("RGB", (canvas_w, canvas_h), bg_exterior)
+                    
+                    # Dibujar el texto si existe
+                    if image_title.strip():
+                        draw = ImageDraw.Draw(final_canvas)
+                        try:
+                            # Intentamos usar la misma fuente de la nube para el título
+                            title_font = ImageFont.truetype(font_path, 60)
+                        except:
+                            title_font = ImageFont.load_default()
+                        
+                        # Centrar el texto en el espacio superior
+                        bbox = draw.textbbox((0, 0), image_title.strip(), font=title_font)
+                        text_w = bbox[2] - bbox[0]
+                        text_x = (canvas_w - text_w) / 2
+                        
+                        draw.text((text_x, 25), image_title.strip(), fill=title_color, font=title_font)
 
-                    # Mostrar en la cuadrícula
+                    # Pegar la nube debajo del título (o en el tope si no hay título)
+                    paste_mask = Image.fromarray((255 - mask_array).astype(np.uint8))
+                    final_canvas.paste(wc_image, (0, y_offset), paste_mask)
+
+                    # Mostrar en la cuadrícula web
                     with grid_cols[idx % 2]:
                         st.markdown(f"### {shape_name} + {font_name}")
                         st.image(final_canvas, use_container_width=True)
