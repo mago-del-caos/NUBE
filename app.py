@@ -8,7 +8,7 @@ import os
 import urllib.request
 
 # --- CONFIGURACIÓN ---
-st.set_page_config(page_title="Generador de Nubes", page_icon="☁️", layout="wide")
+st.set_page_config(page_title="Nube Juventud", page_icon="☁️", layout="wide")
 
 # --- LOGO EN EL ENCABEZADO ---
 if os.path.exists("logo.png"):
@@ -16,8 +16,8 @@ if os.path.exists("logo.png"):
 else:
     st.info("💡 Sube un archivo 'logo.png' a tu repositorio para que aparezca aquí como encabezado.")
 
-st.title("☁️ Generador de Nubes de Palabras Ultra")
-st.markdown("Elige una de las 8 formas predefinidas, controla el contorno y ajusta los fondos a tu gusto.")
+st.title("☁️ Nube Juventud")
+st.markdown("Generador de nubes de palabras oficial. Compara hasta 4 formas y tipografías al mismo tiempo.")
 
 # --- DESCARGA AUTOMÁTICA DE FUENTES ---
 @st.cache_resource(show_spinner=False)
@@ -61,22 +61,41 @@ available_fonts = load_fonts()
 
 # --- GENERADOR DE MÁSCARAS (FORMAS PREDEFINIDAS) ---
 def get_mask(shape_name):
-    # Lienzo de 800x800 con un margen de 50px para que el contorno no se corte
     mask = Image.new("L", (800, 800), 255)
     draw = ImageDraw.Draw(mask)
     
-    if shape_name == "Cuadrada":
-        draw.rectangle((50, 50, 750, 750), fill=0)
-    elif shape_name == "Circular":
-        draw.ellipse((50, 50, 750, 750), fill=0)
-    elif shape_name == "Triangular":
-        draw.polygon([(400, 50), (50, 750), (750, 750)], fill=0)
-    elif shape_name == "Nube":
+    if shape_name == "Nube Clásica":
         draw.ellipse((200, 300, 600, 600), fill=0)
         draw.ellipse((100, 350, 300, 550), fill=0)
         draw.ellipse((500, 350, 700, 550), fill=0)
         draw.ellipse((250, 150, 450, 450), fill=0)
         draw.ellipse((350, 200, 550, 450), fill=0)
+    elif shape_name == "Nube Esponjosa":
+        draw.ellipse((200, 250, 600, 650), fill=0) 
+        draw.ellipse((100, 400, 300, 600), fill=0)
+        draw.ellipse((500, 400, 700, 600), fill=0)
+        draw.ellipse((250, 150, 450, 450), fill=0)
+        draw.ellipse((350, 180, 550, 480), fill=0)
+        draw.ellipse((150, 250, 350, 450), fill=0)
+        draw.ellipse((450, 250, 650, 450), fill=0)
+    elif shape_name == "Nube Alargada":
+        draw.ellipse((150, 300, 650, 500), fill=0) 
+        draw.ellipse((50, 350, 250, 500), fill=0)
+        draw.ellipse((550, 350, 750, 500), fill=0)
+        draw.ellipse((200, 200, 400, 400), fill=0)
+        draw.ellipse((400, 220, 600, 420), fill=0)
+    elif shape_name == "Nube Tormenta":
+        draw.rectangle((150, 450, 650, 550), fill=0)
+        draw.ellipse((100, 400, 250, 550), fill=0)
+        draw.ellipse((550, 400, 700, 550), fill=0)
+        draw.ellipse((200, 300, 450, 550), fill=0)
+        draw.ellipse((350, 250, 600, 550), fill=0)
+    elif shape_name == "Cuadrada":
+        draw.rectangle((50, 50, 750, 750), fill=0)
+    elif shape_name == "Circular":
+        draw.ellipse((50, 50, 750, 750), fill=0)
+    elif shape_name == "Triangular":
+        draw.polygon([(400, 50), (50, 750), (750, 750)], fill=0)
     elif shape_name == "Estrella":
         draw.polygon([(400, 50), (490, 270), (750, 270), (540, 430), (620, 680), (400, 510), (180, 680), (260, 430), (50, 270), (310, 270)], fill=0)
     elif shape_name == "Corazón":
@@ -93,17 +112,22 @@ def get_mask(shape_name):
 # --- BARRA LATERAL (Configuración) ---
 st.sidebar.header("⚙️ Configuración Visual")
 
-# 1. Forma de la Nube
-st.sidebar.subheader("1. Forma de la Nube")
-opciones_formas = ["Nube", "Circular", "Cuadrada", "Triangular", "Estrella", "Corazón", "Diamante", "Hexágono"]
-shape_choice = st.sidebar.selectbox("Elige el contorno de tu nube", opciones_formas)
+# 1. Forma de la Nube (Multiselector)
+st.sidebar.subheader("1. Formas (Hasta 4)")
+opciones_formas = ["Nube Clásica", "Nube Esponjosa", "Nube Alargada", "Nube Tormenta", "Circular", "Cuadrada", "Triangular", "Estrella", "Corazón", "Diamante", "Hexágono"]
+shape_choices = st.sidebar.multiselect(
+    "Compara distintos contornos:", 
+    options=opciones_formas,
+    default=["Nube Clásica"],
+    max_selections=4
+)
 
-# 2. Tipografías
+# 2. Tipografías (Multiselector)
 st.sidebar.subheader("2. Tipografías")
 font_options = list(available_fonts.keys())
 default_font = ["Roboto"] if "Roboto" in font_options else ([font_options[0]] if font_options else [])
 font_choices = st.sidebar.multiselect(
-    "Elige las fuentes a comparar", 
+    "Elige las fuentes a comparar:", 
     options=font_options, 
     default=default_font
 )
@@ -139,70 +163,70 @@ max_words = st.sidebar.slider("Máximo de palabras", min_value=50, max_value=200
 
 # --- ÁREA PRINCIPAL ---
 text_input = st.text_area("✍️ Ingresa o pega tu texto aquí:", height=150, 
-                          placeholder="Pega el texto del que quieres generar tu obra de arte...")
+                          placeholder="Pega el texto del que quieres extraer las palabras...")
 
 def get_custom_color_func(colors):
     def custom_color_func(word, font_size, position, orientation, random_state=None, **kwargs):
         return random.choice(colors)
     return custom_color_func
 
-if st.button("🚀 Generar Nubes de Palabras", type="primary"):
+if st.button("🚀 Generar Nube Juventud", type="primary"):
     if text_input.strip() == "":
-        st.warning("⚠️ Por favor, ingresa algún texto para generar la nube.")
+        st.warning("⚠️ Por favor, ingresa algún texto.")
     elif len(font_choices) == 0:
         st.warning("⚠️ Selecciona al menos un tipo de letra en la barra lateral.")
+    elif len(shape_choices) == 0:
+        st.warning("⚠️ Selecciona al menos una forma en la barra lateral.")
     else:
-        with st.spinner("Construyendo las capas de la imagen... ¡Creando la magia!"):
+        total_variantes = len(shape_choices) * len(font_choices)
+        with st.spinner(f"Generando {total_variantes} combinaciones... ¡Creando la magia!"):
             
-            # Obtener la máscara matemática de la forma seleccionada
-            mask_array = get_mask(shape_choice)
-
-            st.success(f"✅ ¡Completado! Se generaron {len(font_choices)} variante(s).")
+            st.success(f"✅ ¡Completado! Aquí tienes tus {total_variantes} diseño(s).")
             grid_cols = st.columns(2)
             
-            for idx, font_name in enumerate(font_choices):
-                font_path = available_fonts.get(font_name, None)
+            idx = 0
+            for shape_name in shape_choices:
+                mask_array = get_mask(shape_name)
                 
-                # Generar la nube con fondo sólido
-                wc = WordCloud(
-                    width=800, 
-                    height=800,
-                    background_color=bg_interior, 
-                    mode="RGB",                   
-                    max_words=max_words,
-                    mask=mask_array,
-                    font_path=font_path,
-                    color_func=get_custom_color_func(selected_colors),
-                    collocations=False,
-                    contour_width=contour_width,
-                    contour_color=contour_color
-                ).generate(text_input)
-
-                wc_image = wc.to_image()
-
-                # --- ENSAMBLAR CAPAS (COMPOSICIÓN INTELIGENTE) ---
-                # Capa 1: El lienzo base con el color exterior
-                final_canvas = Image.new("RGB", (800, 800), bg_exterior)
-                
-                # Capa 2: Recortamos la nube usando la máscara original
-                paste_mask = Image.fromarray((255 - mask_array).astype(np.uint8))
-                final_canvas.paste(wc_image, (0, 0), paste_mask)
-
-                with grid_cols[idx % 2]:
-                    st.markdown(f"### {font_name} ({shape_choice})")
+                for font_name in font_choices:
+                    font_path = available_fonts.get(font_name, None)
                     
-                    # Mostrar la imagen terminada directo en Streamlit
-                    st.image(final_canvas, use_container_width=True)
-                    
-                    # Guardar para descarga
-                    buf = BytesIO()
-                    final_canvas.save(buf, format="PNG")
-                    byte_im = buf.getvalue()
+                    # Generar la nube
+                    wc = WordCloud(
+                        width=800, 
+                        height=800,
+                        background_color=bg_interior, 
+                        mode="RGB",                   
+                        max_words=max_words,
+                        mask=mask_array,
+                        font_path=font_path,
+                        color_func=get_custom_color_func(selected_colors),
+                        collocations=False,
+                        contour_width=contour_width,
+                        contour_color=contour_color
+                    ).generate(text_input)
 
-                    st.download_button(
-                        label=f"📥 Descargar ({font_name})",
-                        data=byte_im,
-                        file_name=f"nube_{shape_choice.lower()}_{font_name.lower().replace(' ', '_')}.png",
-                        mime="image/png",
-                        key=f"dl_{font_name}"
-                    )
+                    wc_image = wc.to_image()
+
+                    # Composición
+                    final_canvas = Image.new("RGB", (800, 800), bg_exterior)
+                    paste_mask = Image.fromarray((255 - mask_array).astype(np.uint8))
+                    final_canvas.paste(wc_image, (0, 0), paste_mask)
+
+                    # Mostrar en la cuadrícula
+                    with grid_cols[idx % 2]:
+                        st.markdown(f"### {shape_name} + {font_name}")
+                        st.image(final_canvas, use_container_width=True)
+                        
+                        buf = BytesIO()
+                        final_canvas.save(buf, format="PNG")
+                        byte_im = buf.getvalue()
+
+                        st.download_button(
+                            label=f"📥 Descargar",
+                            data=byte_im,
+                            file_name=f"NubeJuventud_{shape_name.replace(' ', '')}_{font_name.replace(' ', '')}.png",
+                            mime="image/png",
+                            key=f"dl_{shape_name}_{font_name}_{idx}"
+                        )
+                    idx += 1
