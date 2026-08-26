@@ -11,6 +11,13 @@ import urllib.request
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Generador de Nubes", page_icon="☁️", layout="wide")
 
+# --- LOGO EN EL ENCABEZADO ---
+# Verifica si el archivo logo.png existe en el repositorio
+if os.path.exists("logo.png"):
+    st.image("logo.png", use_container_width=True)
+else:
+    st.info("💡 Sube un archivo llamado 'logo.png' a tu repositorio en GitHub para que aparezca aquí como encabezado.")
+
 st.title("☁️ Generador de Nubes de Palabras Ultra")
 st.markdown("Sube tus propias siluetas, ajusta colores dinámicos y compara múltiples tipos de letra al instante.")
 
@@ -69,25 +76,30 @@ def get_mask(shape_name):
         draw.polygon([(400, 50), (50, 750), (750, 750)], fill=0)
         
     elif shape_name == "Nube Mejorada":
-        # Geometría de nube más orgánica y profesional
-        draw.ellipse((200, 300, 600, 600), fill=0) # Base central
-        draw.ellipse((100, 350, 300, 550), fill=0) # Borde izquierdo
-        draw.ellipse((500, 350, 700, 550), fill=0) # Borde derecho
-        draw.ellipse((250, 150, 450, 450), fill=0) # Cúpula superior izquierda
-        draw.ellipse((350, 200, 550, 450), fill=0) # Cúpula superior derecha
+        draw.ellipse((200, 300, 600, 600), fill=0)
+        draw.ellipse((100, 350, 300, 550), fill=0)
+        draw.ellipse((500, 350, 700, 550), fill=0)
+        draw.ellipse((250, 150, 450, 450), fill=0)
+        draw.ellipse((350, 200, 550, 450), fill=0)
         
     return np.array(mask)
 
 # --- BARRA LATERAL (Configuración) ---
 st.sidebar.header("⚙️ Configuración Visual")
 
-# 1. Selector de Fuentes Múltiples
+# 1. Selector de Fuentes Múltiples (A prueba de fallos de red)
 st.sidebar.subheader("Tipografías")
+font_options = list(available_fonts.keys())
+default_font = ["Roboto"] if "Roboto" in font_options else ([font_options[0]] if font_options else [])
+
 font_choices = st.sidebar.multiselect(
-    "Elige los tipos de letra (Generaremos una nube por cada letra para que compares)", 
-    options=list(available_fonts.keys()), 
-    default=["Roboto"]
+    "Elige los tipos de letra (Generaremos una nube por cada letra para comparar)", 
+    options=font_options, 
+    default=default_font
 )
+
+if not font_options:
+    st.sidebar.warning("⚠️ Hubo un problema de red al descargar las fuentes. Reinicia la app desde Streamlit para reintentar.")
 
 # 2. Selector de Formas e Imágenes Propias
 st.sidebar.subheader("Forma / Silueta")
@@ -120,7 +132,6 @@ max_words = st.sidebar.slider("Máximo de palabras", min_value=50, max_value=200
 text_input = st.text_area("✍️ Ingresa o pega tu texto aquí:", height=150, 
                           placeholder="Pega el texto del que quieres generar tu obra de arte...")
 
-# Función dinámica de colores
 def get_custom_color_func(colors):
     def custom_color_func(word, font_size, position, orientation, random_state=None, **kwargs):
         return random.choice(colors)
@@ -139,26 +150,21 @@ if st.button("🚀 Generar Nubes de Palabras", type="primary"):
             # --- PROCESAR LA FORMA ---
             mask_array = None
             if shape_choice == "🎨 Subir mi propia silueta":
-                # Convertir imagen subida a escala de grises y luego a máscara de contraste
                 img = Image.open(uploaded_mask).convert("L")
-                # Escalar para mantener buena calidad sin sobrecargar
                 img = img.resize((1000, int(1000 * img.height / img.width)))
                 m_array = np.array(img)
-                # Los pixeles blancos (>128) se vuelven fondo (255), los oscuros se vuelven área de dibujo (0)
                 mask_array = np.where(m_array > 128, 255, 0).astype(np.uint8)
             else:
                 mask_array = get_mask(shape_choice)
 
-            # --- GENERAR LAS NUBES (Una por cada tipografía elegida) ---
+            # --- GENERAR LAS NUBES ---
             st.success(f"✅ ¡Completado! Se generaron {len(font_choices)} variante(s).")
             
-            # Crear columnas para mostrar las imágenes organizadas
             grid_cols = st.columns(2)
             
             for idx, font_name in enumerate(font_choices):
                 font_path = available_fonts.get(font_name, None)
                 
-                # Configurar y generar
                 wc = WordCloud(
                     width=800, 
                     height=800 if mask_array is None else mask_array.shape[0],
@@ -170,18 +176,15 @@ if st.button("🚀 Generar Nubes de Palabras", type="primary"):
                     collocations=False
                 ).generate(text_input)
 
-                # Renderizar
                 fig, ax = plt.subplots(figsize=(8, 8))
                 ax.imshow(wc, interpolation='bilinear')
                 ax.axis("off")
                 fig.patch.set_facecolor(bg_color)
                 
-                # Preparar para descargar
                 buf = BytesIO()
                 fig.savefig(buf, format="png", dpi=300, bbox_inches='tight', facecolor=bg_color)
                 byte_im = buf.getvalue()
 
-                # Mostrar en la cuadrícula de la web
                 with grid_cols[idx % 2]:
                     st.markdown(f"### Letra: {font_name}")
                     st.pyplot(fig)
