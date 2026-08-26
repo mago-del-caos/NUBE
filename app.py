@@ -11,8 +11,8 @@ import urllib.request
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Generador de Nubes", page_icon="☁️", layout="wide")
 
-st.title("☁️ Generador de Nubes de Palabras Pro")
-st.markdown("Personaliza la forma de tu nube, elige entre 15 tipografías distintas y ajusta tus colores.")
+st.title("☁️ Generador de Nubes de Palabras Ultra")
+st.markdown("Sube tus propias siluetas, ajusta colores dinámicos y compara múltiples tipos de letra al instante.")
 
 # --- DESCARGA AUTOMÁTICA DE FUENTES ---
 @st.cache_resource(show_spinner=False)
@@ -21,7 +21,6 @@ def load_fonts():
     if not os.path.exists(fonts_dir):
         os.makedirs(fonts_dir)
     
-    # 15 Fuentes seleccionadas de Google Fonts
     font_urls = {
         "Roboto": "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf",
         "Oswald": "https://github.com/google/fonts/raw/main/ofl/oswald/Oswald-Regular.ttf",
@@ -47,7 +46,7 @@ def load_fonts():
             try:
                 urllib.request.urlretrieve(url, path)
             except Exception:
-                continue # Si falla una, pasa a la siguiente
+                continue 
         if os.path.exists(path):
             font_paths[name] = path
             
@@ -58,9 +57,8 @@ available_fonts = load_fonts()
 # --- GENERADOR DE MÁSCARAS (FORMAS) ---
 def get_mask(shape_name):
     if shape_name == "Cuadrada":
-        return None # WordCloud por defecto es cuadrado/rectangular
+        return None 
         
-    # Crear un lienzo en blanco (800x800)
     mask = Image.new("L", (800, 800), 255)
     draw = ImageDraw.Draw(mask)
     
@@ -70,88 +68,127 @@ def get_mask(shape_name):
     elif shape_name == "Triangular":
         draw.polygon([(400, 50), (50, 750), (750, 750)], fill=0)
         
-    elif shape_name == "Nube":
-        # Construimos una nube superponiendo círculos
-        draw.ellipse((250, 150, 550, 450), fill=0)
-        draw.ellipse((100, 300, 400, 600), fill=0)
-        draw.ellipse((400, 300, 700, 600), fill=0)
-        draw.ellipse((200, 400, 600, 650), fill=0)
+    elif shape_name == "Nube Mejorada":
+        # Geometría de nube más orgánica y profesional
+        draw.ellipse((200, 300, 600, 600), fill=0) # Base central
+        draw.ellipse((100, 350, 300, 550), fill=0) # Borde izquierdo
+        draw.ellipse((500, 350, 700, 550), fill=0) # Borde derecho
+        draw.ellipse((250, 150, 450, 450), fill=0) # Cúpula superior izquierda
+        draw.ellipse((350, 200, 550, 450), fill=0) # Cúpula superior derecha
         
     return np.array(mask)
 
 # --- BARRA LATERAL (Configuración) ---
-st.sidebar.header("🎨 Configuración Visual")
+st.sidebar.header("⚙️ Configuración Visual")
 
-# Opciones Tipográficas y de Forma
-st.sidebar.subheader("Estilo")
-font_choice = st.sidebar.selectbox("Tipo de Letra", options=list(available_fonts.keys()))
-shape_choice = st.sidebar.selectbox("Forma del Contorno", ["Nube", "Circular", "Cuadrada", "Triangular"])
+# 1. Selector de Fuentes Múltiples
+st.sidebar.subheader("Tipografías")
+font_choices = st.sidebar.multiselect(
+    "Elige los tipos de letra (Generaremos una nube por cada letra para que compares)", 
+    options=list(available_fonts.keys()), 
+    default=["Roboto"]
+)
 
-# Paleta de colores
+# 2. Selector de Formas e Imágenes Propias
+st.sidebar.subheader("Forma / Silueta")
+shape_choice = st.sidebar.selectbox("Elige la forma de la nube", ["Nube Mejorada", "Circular", "Cuadrada", "Triangular", "🎨 Subir mi propia silueta"])
+
+uploaded_mask = None
+if shape_choice == "🎨 Subir mi propia silueta":
+    st.sidebar.info("💡 Sube una imagen con fondo blanco. Las palabras rellenarán las partes oscuras de la imagen.")
+    uploaded_mask = st.sidebar.file_uploader("Sube tu silueta (PNG, JPG)", type=["png", "jpg", "jpeg"])
+
+# 3. Colores Dinámicos
 st.sidebar.subheader("Paleta de Colores")
-col1, col2 = st.sidebar.columns(2)
-with col1:
-    color_1 = st.color_picker("Color 1", "#FF4B4B")
-    color_2 = st.color_picker("Color 2", "#FFA421")
-with col2:
-    color_3 = st.color_picker("Color 3", "#00C246")
-    color_4 = st.color_picker("Color 4", "#00A1F1")
+num_colors = st.sidebar.number_input("¿Cuántos colores quieres usar?", min_value=1, max_value=10, value=4)
+selected_colors = []
+color_cols = st.sidebar.columns(2)
+default_hex = ["#FF4B4B", "#FFA421", "#00C246", "#00A1F1", "#9D00FF", "#FF007F", "#FFD700", "#00FFFF", "#8B4513", "#808080"]
+
+for i in range(int(num_colors)):
+    with color_cols[i % 2]:
+        color = st.color_picker(f"Color {i+1}", default_hex[i % len(default_hex)], key=f"color_{i}")
+        selected_colors.append(color)
 
 bg_color = st.sidebar.color_picker("Color de Fondo", "#0E1117")
 
-# Ajustes de la nube
-st.sidebar.subheader("Ajustes")
-max_words = st.sidebar.slider("Máximo de palabras", min_value=10, max_value=1000, value=300)
+# Ajustes Extra
+st.sidebar.subheader("Densidad")
+max_words = st.sidebar.slider("Máximo de palabras", min_value=50, max_value=2000, value=300)
 
 # --- ÁREA PRINCIPAL ---
-text_input = st.text_area("✍️ Ingresa o pega tu texto aquí:", height=200, 
+text_input = st.text_area("✍️ Ingresa o pega tu texto aquí:", height=150, 
                           placeholder="Pega el texto del que quieres generar tu obra de arte...")
 
-def custom_color_func(word, font_size, position, orientation, random_state=None, **kwargs):
-    colors = [color_1, color_2, color_3, color_4]
-    return random.choice(colors)
+# Función dinámica de colores
+def get_custom_color_func(colors):
+    def custom_color_func(word, font_size, position, orientation, random_state=None, **kwargs):
+        return random.choice(colors)
+    return custom_color_func
 
-if st.button("🚀 Generar Nube de Palabras", type="primary"):
+if st.button("🚀 Generar Nubes de Palabras", type="primary"):
     if text_input.strip() == "":
-        st.warning("Por favor, ingresa algún texto para generar la nube.")
+        st.warning("⚠️ Por favor, ingresa algún texto para generar la nube.")
+    elif len(font_choices) == 0:
+        st.warning("⚠️ Selecciona al menos un tipo de letra en la barra lateral.")
+    elif shape_choice == "🎨 Subir mi propia silueta" and uploaded_mask is None:
+        st.warning("⚠️ Has elegido subir tu propia silueta. Por favor, sube una imagen en la barra lateral para continuar.")
     else:
-        with st.spinner("Creando la magia..."):
+        with st.spinner("Procesando siluetas, colores y letras... ¡Creando la magia!"):
             
-            # Obtener datos seleccionados
-            mask_array = get_mask(shape_choice)
-            font_path = available_fonts.get(font_choice, None)
+            # --- PROCESAR LA FORMA ---
+            mask_array = None
+            if shape_choice == "🎨 Subir mi propia silueta":
+                # Convertir imagen subida a escala de grises y luego a máscara de contraste
+                img = Image.open(uploaded_mask).convert("L")
+                # Escalar para mantener buena calidad sin sobrecargar
+                img = img.resize((1000, int(1000 * img.height / img.width)))
+                m_array = np.array(img)
+                # Los pixeles blancos (>128) se vuelven fondo (255), los oscuros se vuelven área de dibujo (0)
+                mask_array = np.where(m_array > 128, 255, 0).astype(np.uint8)
+            else:
+                mask_array = get_mask(shape_choice)
+
+            # --- GENERAR LAS NUBES (Una por cada tipografía elegida) ---
+            st.success(f"✅ ¡Completado! Se generaron {len(font_choices)} variante(s).")
             
-            # Generar la nube
-            wc = WordCloud(
-                width=800, 
-                height=800,
-                background_color=bg_color,
-                max_words=max_words,
-                mask=mask_array,
-                font_path=font_path,
-                color_func=custom_color_func,
-                collocations=False,
-                contour_width=3 if shape_choice != "Cuadrada" else 0, # Agrega un contorno a la forma
-                contour_color=color_1
-            ).generate(text_input)
-
-            # Crear figura
-            fig, ax = plt.subplots(figsize=(8, 8))
-            ax.imshow(wc, interpolation='bilinear')
-            ax.axis("off")
-            fig.patch.set_facecolor(bg_color)
+            # Crear columnas para mostrar las imágenes organizadas
+            grid_cols = st.columns(2)
             
-            # Mostrar
-            st.pyplot(fig)
+            for idx, font_name in enumerate(font_choices):
+                font_path = available_fonts.get(font_name, None)
+                
+                # Configurar y generar
+                wc = WordCloud(
+                    width=800, 
+                    height=800 if mask_array is None else mask_array.shape[0],
+                    background_color=bg_color,
+                    max_words=max_words,
+                    mask=mask_array,
+                    font_path=font_path,
+                    color_func=get_custom_color_func(selected_colors),
+                    collocations=False
+                ).generate(text_input)
 
-            # Descargar
-            buf = BytesIO()
-            fig.savefig(buf, format="png", dpi=300, bbox_inches='tight', facecolor=bg_color)
-            byte_im = buf.getvalue()
+                # Renderizar
+                fig, ax = plt.subplots(figsize=(8, 8))
+                ax.imshow(wc, interpolation='bilinear')
+                ax.axis("off")
+                fig.patch.set_facecolor(bg_color)
+                
+                # Preparar para descargar
+                buf = BytesIO()
+                fig.savefig(buf, format="png", dpi=300, bbox_inches='tight', facecolor=bg_color)
+                byte_im = buf.getvalue()
 
-            st.download_button(
-                label=f"📥 Descargar Nube {shape_choice} en Alta Resolución",
-                data=byte_im,
-                file_name=f"nube_{shape_choice.lower()}.png",
-                mime="image/png"
-            )
+                # Mostrar en la cuadrícula de la web
+                with grid_cols[idx % 2]:
+                    st.markdown(f"### Letra: {font_name}")
+                    st.pyplot(fig)
+                    st.download_button(
+                        label=f"📥 Descargar nube ({font_name})",
+                        data=byte_im,
+                        file_name=f"nube_{font_name.lower().replace(' ', '_')}.png",
+                        mime="image/png",
+                        key=f"dl_{font_name}"
+                    )
