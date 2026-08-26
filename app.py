@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from wordcloud import WordCloud
 import random
 from io import BytesIO
@@ -10,11 +11,69 @@ import urllib.request
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Nube Juventud", page_icon="☁️", layout="wide")
 
+# --- CONVERSIÓN A PWA (APP DESCARGABLE) ---
+def setup_pwa():
+    # Inyectamos el manifiesto web dinámicamente en el documento principal
+    pwa_code = """
+    <script>
+        if (!window.parent.document.getElementById("pwa-manifest")) {
+            const manifest = {
+                "name": "Nube Juventud",
+                "short_name": "Nube",
+                "theme_color": "#0E1117",
+                "background_color": "#0E1117",
+                "display": "standalone",
+                "orientation": "portrait",
+                "start_url": ".",
+                "icons": [
+                    {
+                        "src": "https://raw.githubusercontent.com/mago-del-caos/nube/main/app.png",
+                        "sizes": "192x192",
+                        "type": "image/png"
+                    },
+                    {
+                        "src": "https://raw.githubusercontent.com/mago-del-caos/nube/main/app.png",
+                        "sizes": "512x512",
+                        "type": "image/png"
+                    }
+                ]
+            };
+            
+            const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+            const manifestURL = URL.createObjectURL(blob);
+            
+            const link = window.parent.document.createElement('link');
+            link.id = "pwa-manifest";
+            link.rel = 'manifest';
+            link.href = manifestURL;
+            window.parent.document.head.appendChild(link);
+            
+            const appleIcon = window.parent.document.createElement('link');
+            appleIcon.rel = 'apple-touch-icon';
+            appleIcon.href = "https://raw.githubusercontent.com/mago-del-caos/nube/main/app.png";
+            window.parent.document.head.appendChild(appleIcon);
+            
+            const metaApp = window.parent.document.createElement('meta');
+            metaApp.name = "apple-mobile-web-app-capable";
+            metaApp.content = "yes";
+            window.parent.document.head.appendChild(metaApp);
+            
+            const metaStatus = window.parent.document.createElement('meta');
+            metaStatus.name = "apple-mobile-web-app-status-bar-style";
+            metaStatus.content = "black-translucent";
+            window.parent.document.head.appendChild(metaStatus);
+        }
+    </script>
+    """
+    components.html(pwa_code, height=0)
+
+setup_pwa()
+
 # --- LOGO EN EL ENCABEZADO ---
 if os.path.exists("logo.png"):
     st.image("logo.png", use_container_width=True)
 else:
-    st.info("💡 Sube un archivo 'logo.png' a tu repositorio para que aparezca aquí como encabezado.")
+    st.info("💡 Sube un archivo 'logo.png' a tu repositorio para que aparezca aquí.")
 
 st.title("☁️ Nube Juventud")
 st.markdown("Generador de nubes de palabras oficial. Compara formas y tipografías, y añade encabezados personalizados.")
@@ -59,7 +118,7 @@ def load_fonts():
 
 available_fonts = load_fonts()
 
-# --- GENERADOR DE MÁSCARAS (FORMAS PREDEFINIDAS) ---
+# --- GENERADOR DE MÁSCARAS ---
 def get_mask(shape_name):
     mask = Image.new("L", (800, 800), 255)
     draw = ImageDraw.Draw(mask)
@@ -112,7 +171,6 @@ def get_mask(shape_name):
 # --- BARRA LATERAL (Configuración) ---
 st.sidebar.header("⚙️ Configuración Visual")
 
-# 1. Forma de la Nube
 st.sidebar.subheader("1. Formas (Hasta 4)")
 opciones_formas = ["Nube Clásica", "Nube Esponjosa", "Nube Alargada", "Nube Tormenta", "Circular", "Cuadrada", "Triangular", "Estrella", "Corazón", "Diamante", "Hexágono"]
 shape_choices = st.sidebar.multiselect(
@@ -122,7 +180,6 @@ shape_choices = st.sidebar.multiselect(
     max_selections=4
 )
 
-# 2. Tipografías
 st.sidebar.subheader("2. Tipografías")
 font_options = list(available_fonts.keys())
 default_font = ["Roboto"] if "Roboto" in font_options else ([font_options[0]] if font_options else [])
@@ -133,14 +190,12 @@ font_choices = st.sidebar.multiselect(
 )
 
 if not font_options:
-    st.sidebar.warning("⚠️ Problema de red descargando fuentes. Reinicia la app en Streamlit.")
+    st.sidebar.warning("⚠️ Problema de red descargando fuentes. Reinicia la app.")
 
-# 3. Título de la Imagen
 st.sidebar.subheader("3. Título de la Imagen")
 image_title = st.sidebar.text_input("Escribe un encabezado (opcional):", "")
 title_color = st.sidebar.color_picker("Color del Encabezado", "#FFFFFF")
 
-# 4. Colores de la Nube y Contorno
 st.sidebar.subheader("4. Fondos y Contorno")
 col_bg1, col_bg2 = st.sidebar.columns(2)
 with col_bg1:
@@ -150,7 +205,6 @@ with col_bg2:
     contour_color = st.color_picker("Color Contorno", "#FFFFFF")
     contour_width = st.slider("Ancho Contorno", 0, 15, 3)
 
-# 5. Paleta de Palabras
 st.sidebar.subheader("5. Colores de Palabras")
 num_colors = st.sidebar.number_input("¿Cuántos colores usar?", min_value=1, max_value=10, value=4)
 selected_colors = []
@@ -162,7 +216,6 @@ for i in range(int(num_colors)):
         color = st.color_picker(f"Color {i+1}", default_hex[i % len(default_hex)], key=f"color_{i}")
         selected_colors.append(color)
 
-# 6. Ajustes Extra
 st.sidebar.subheader("6. Densidad")
 max_words = st.sidebar.slider("Máximo de palabras", min_value=50, max_value=2000, value=300)
 
@@ -196,7 +249,6 @@ if st.button("🚀 Generar Nube Juventud", type="primary"):
                 for font_name in font_choices:
                     font_path = available_fonts.get(font_name, None)
                     
-                    # Generar la nube base
                     wc = WordCloud(
                         width=800, 
                         height=800,
@@ -213,34 +265,28 @@ if st.button("🚀 Generar Nube Juventud", type="primary"):
 
                     wc_image = wc.to_image()
 
-                    # --- COMPOSICIÓN DEL LIENZO FINAL CON O SIN TÍTULO ---
                     canvas_w = 800
                     y_offset = 120 if image_title.strip() else 0
                     canvas_h = 800 + y_offset
                     
                     final_canvas = Image.new("RGB", (canvas_w, canvas_h), bg_exterior)
                     
-                    # Dibujar el texto si existe
                     if image_title.strip():
                         draw = ImageDraw.Draw(final_canvas)
                         try:
-                            # Intentamos usar la misma fuente de la nube para el título
                             title_font = ImageFont.truetype(font_path, 60)
                         except:
                             title_font = ImageFont.load_default()
                         
-                        # Centrar el texto en el espacio superior
                         bbox = draw.textbbox((0, 0), image_title.strip(), font=title_font)
                         text_w = bbox[2] - bbox[0]
                         text_x = (canvas_w - text_w) / 2
                         
                         draw.text((text_x, 25), image_title.strip(), fill=title_color, font=title_font)
 
-                    # Pegar la nube debajo del título (o en el tope si no hay título)
                     paste_mask = Image.fromarray((255 - mask_array).astype(np.uint8))
                     final_canvas.paste(wc_image, (0, y_offset), paste_mask)
 
-                    # Mostrar en la cuadrícula web
                     with grid_cols[idx % 2]:
                         st.markdown(f"### {shape_name} + {font_name}")
                         st.image(final_canvas, use_container_width=True)
