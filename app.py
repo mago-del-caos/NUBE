@@ -151,12 +151,12 @@ if st.button("🚀 Generar Nubes de Palabras", type="primary"):
             for idx, font_name in enumerate(font_choices):
                 font_path = available_fonts.get(font_name, None)
                 
-                # Generar la nube transparente con contorno
+                # Generar la nube con fondo sólido (evita el bug interno de la librería con los contornos)
                 wc = WordCloud(
                     width=width, 
                     height=height,
-                    background_color=None, # La nube se genera sin fondo
-                    mode="RGBA",
+                    background_color=bg_interior, # Usamos el color interior directamente aquí
+                    mode="RGB",                   # Modo RGB estándar para que el contorno funcione perfecto
                     max_words=max_words,
                     mask=mask_array,
                     font_path=font_path,
@@ -168,19 +168,13 @@ if st.button("🚀 Generar Nubes de Palabras", type="primary"):
 
                 wc_image = wc.to_image()
 
-                # --- ENSAMBLAR CAPAS (COMPOSICIÓN) ---
-                # Capa 1: El fondo exterior sólido
-                final_canvas = Image.new("RGBA", (width, height), bg_exterior)
+                # --- ENSAMBLAR CAPAS (COMPOSICIÓN INTELIGENTE) ---
+                # Capa 1: El lienzo base con el color exterior
+                final_canvas = Image.new("RGB", (width, height), bg_exterior)
                 
-                # Capa 2: El fondo interior de la nube
-                interior_layer = Image.new("RGBA", (width, height), bg_interior)
-                
-                # Pegar el interior usando la máscara exacta de la forma
+                # Capa 2: Recortamos la nube (que ya tiene el fondo interior) y la pegamos sobre el lienzo
                 paste_mask = Image.fromarray((255 - mask_array).astype(np.uint8))
-                final_canvas.paste(interior_layer, (0, 0), paste_mask)
-                
-                # Capa 3: La Nube (Palabras + Contorno) sobre todo lo demás
-                final_canvas.paste(wc_image, (0, 0), wc_image)
+                final_canvas.paste(wc_image, (0, 0), paste_mask)
 
                 with grid_cols[idx % 2]:
                     st.markdown(f"### {font_name}")
